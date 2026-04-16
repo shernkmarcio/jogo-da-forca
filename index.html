@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jogo da Forca</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Georgia', serif;
+    background: #0f0c1c;
+    color: #e8e3f5;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
+
+  h1 {
+    font-size: 2rem;
+    color: #f5d060;
+    letter-spacing: 4px;
+    text-align: center;
+    margin: 18px 0 4px;
+    text-shadow: 0 0 30px #f5d06055;
+  }
+
+  .subtitle { font-size: 0.85rem; color: #6a6385; letter-spacing: 2px; margin-bottom: 20px; }
+
+  .container {
+    display: flex;
+    gap: 30px;
+    width: 100%;
+    max-width: 860px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* ── Painel esquerdo ── */
+  .left {
+    background: #1a1630;
+    border-radius: 16px;
+    border: 1px solid #2e2850;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    min-width: 280px;
+  }
+
+  canvas#gallows { display: block; }
+
+  .lives {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .life-dot {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: #50dc82;
+    transition: background 0.3s;
+    box-shadow: 0 0 8px #50dc8266;
+  }
+  .life-dot.lost { background: #ff5a5a; box-shadow: 0 0 8px #ff5a5a66; }
+
+  .hint-box {
+    background: #120f24;
+    border: 1px solid #2e2850;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-style: italic;
+    font-size: 0.85rem;
+    color: #9b95b8;
+    text-align: center;
+    width: 100%;
+  }
+  .hint-box span { color: #f5d060; }
+
+  /* ── Painel direito ── */
+  .right {
+    flex: 1;
+    min-width: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* Palavra */
+  .word-row {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 16px 0;
+  }
+
+  .letter-box {
+    width: 36px; height: 44px;
+    border-bottom: 2px solid #3d3760;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Courier New', monospace;
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: #50dc82;
+    transition: all 0.3s;
+    position: relative;
+  }
+
+  .letter-box.wrong-reveal { color: #ff5a5a; border-color: #ff5a5a44; }
+
+  /* Teclado */
+  .keyboard { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+
+  .key-row { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; }
+
+  .key {
+    width: 44px; height: 44px;
+    border-radius: 8px;
+    border: 1px solid #3d3760;
+    background: #1e1a38;
+    color: #c8c3e0;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .key:hover:not(:disabled) { background: #2e2850; border-color: #6a60a0; transform: translateY(-2px); }
+  .key:active:not(:disabled) { transform: translateY(0); }
+  .key.correct { background: #1a3d28; border-color: #50dc82; color: #50dc82; cursor: default; }
+  .key.wrong   { background: #1a0f0f; border-color: #ff5a5a44; color: #3d2020; cursor: default; }
+  .key:disabled { cursor: default; }
+
+  /* Erros */
+  .wrong-letters {
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    color: #ff5a5a;
+    text-align: center;
+    min-height: 20px;
+    letter-spacing: 3px;
+  }
+
+  /* Overlay */
+  .overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: #00000088;
+    z-index: 10;
+    align-items: center;
+    justify-content: center;
+  }
+  .overlay.show { display: flex; }
+
+  .modal {
+    background: #1a1630;
+    border: 1px solid #3d3760;
+    border-radius: 20px;
+    padding: 40px 48px;
+    text-align: center;
+    box-shadow: 0 20px 60px #00000088;
+    animation: popIn 0.3s ease;
+  }
+  @keyframes popIn {
+    from { transform: scale(0.85); opacity: 0; }
+    to   { transform: scale(1);    opacity: 1; }
+  }
+  .modal h2 { font-size: 2rem; margin-bottom: 10px; }
+  .modal .word-reveal { font-family: 'Courier New', monospace; font-size: 1.1rem; color: #c8c3e0; margin: 12px 0 24px; }
+  .modal .word-reveal strong { color: #f5d060; letter-spacing: 3px; }
+  .modal button {
+    background: #f5d060;
+    color: #0f0c1c;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 32px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .modal button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px #f5d06055; }
+
+  /* Partículas */
+  #particles { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+</style>
+</head>
+<body>
+
+<h1>JOGO DA FORCA</h1>
+<p class="subtitle">ADIVINHE A PALAVRA</p>
+
+<div class="container">
+  <div class="left">
+    <canvas id="gallows" width="220" height="260"></canvas>
+    <div class="lives" id="lives"></div>
+    <div class="hint-box">💡 <span id="hint-text">—</span></div>
+    <div class="wrong-letters" id="wrong-letters"></div>
+  </div>
+  <div class="right">
+    <div class="word-row" id="word-row"></div>
+    <div class="keyboard" id="keyboard"></div>
+  </div>
+</div>
+
+<canvas id="particles"></canvas>
+
+<div class="overlay" id="overlay">
+  <div class="modal" id="modal">
+    <h2 id="modal-title"></h2>
+    <p class="word-reveal" id="modal-word"></p>
+    <button onclick="newGame()">JOGAR NOVAMENTE</button>
+  </div>
+</div>
+
+<script>
+const PALAVRAS = [
+  ["costela",     "comida preferida do MARCIO SHERNK"],
+  ["hornet",    "Moto preferida do MARCIO SHERNK"],
+  ["palmeiras", "Time do MARCIO SHERNK"],
+  ["tenis",  "esporte preferido do MARCIO SHERNK"],
+  ["bombeiro",   "Profissao do MARCIO SHERNK"],
+  ["mghm",   "iniciais do nomes das filhas MARCIO SHERNK"],
+  ["ANGELINA",   "nome da mãe do MARCIO SHERNK"],
+  ["coruja",  "animal que mais gosta MARCIO SHERNK"],
+  ["londres", "pais de sonho de MARCIO SHERNK"],
+  ["super sonico",   "sonho de MARCIO SHERNK"],
+  ["python",     "curso atual de MARCIO SHERNK"],
+  ["budogue", "cachorro que acha bonito MARCIO SHERNK"],
+  ["campinas", "cidade natal de MARCIO SHERNK"],
+  ["morango","fruta preferida de MARCIO SHERNK"],
+  ["analise de sistemas",    "qual faculdade MARCIO SHERNK TEM?"],
+];
+
+const MAX_ERROS = 6;
+let word, hint, wrong, guessed, gameOver;
+
+function newGame() {
+  const entry = PALAVRAS[Math.floor(Math.random() * PALAVRAS.length)];
+  word    = entry[0];
+  hint    = entry[1];
+  wrong   = 0;
+  guessed = new Set();
+  gameOver = false;
+  document.getElementById('overlay').classList.remove('show');
+  renderAll();
+}
+
+function renderAll() {
+  renderLives();
+  renderWord();
+  renderKeyboard();
+  renderWrongLetters();
+  drawGallows();
+  document.getElementById('hint-text').textContent = hint;
+}
+
+function renderLives() {
+  const el = document.getElementById('lives');
+  el.innerHTML = '';
+  for (let i = 0; i < MAX_ERROS; i++) {
+    const d = document.createElement('div');
+    d.className = 'life-dot' + (i < wrong ? ' lost' : '');
+    el.appendChild(d);
+  }
+}
+
+function renderWord() {
+  const row = document.getElementById('word-row');
+  row.innerHTML = '';
+  for (const c of word) {
+    const box = document.createElement('div');
+    box.className = 'letter-box';
+    if (guessed.has(c)) {
+      box.textContent = c.toUpperCase();
+    } else if (gameOver && wrong >= MAX_ERROS) {
+      box.textContent = c.toUpperCase();
+      box.classList.add('wrong-reveal');
+    }
+    row.appendChild(box);
+  }
+}
+
+function renderKeyboard() {
+  const rows = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+  const kb = document.getElementById('keyboard');
+  kb.innerHTML = '';
+  for (const row of rows) {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'key-row';
+    for (const c of row) {
+      const btn = document.createElement('button');
+      btn.className = 'key';
+      btn.textContent = c.toUpperCase();
+      btn.id = 'key-' + c;
+      if (guessed.has(c)) {
+        btn.classList.add(word.includes(c) ? 'correct' : 'wrong');
+        btn.disabled = true;
+      } else if (gameOver) {
+        btn.disabled = true;
+      } else {
+        btn.onclick = () => guess(c);
+      }
+      rowEl.appendChild(btn);
+    }
+    kb.appendChild(rowEl);
+  }
+}
+
+function renderWrongLetters() {
+  const wl = [...guessed].filter(c => !word.includes(c));
+  document.getElementById('wrong-letters').textContent =
+    wl.length ? 'Erros: ' + wl.map(c => c.toUpperCase()).join('  ') : '';
+}
+
+function guess(letter) {
+  if (gameOver || guessed.has(letter)) return;
+  guessed.add(letter);
+
+  if (word.includes(letter)) {
+    spawnParticles('#50dc82', 30);
+    if ([...word].every(c => guessed.has(c))) {
+      gameOver = true;
+      renderAll();
+      setTimeout(() => showModal('won'), 600);
+      spawnParticles('#f5d060', 80);
+      return;
+    }
+  } else {
+    wrong++;
+    spawnParticles('#ff5a5a', 20);
+    shakeCanvas();
+    if (wrong >= MAX_ERROS) {
+      gameOver = true;
+      renderAll();
+      setTimeout(() => showModal('lost'), 700);
+      return;
+    }
+  }
+  renderAll();
+}
+
+function showModal(state) {
+  const title = document.getElementById('modal-title');
+  const wordEl = document.getElementById('modal-word');
+  if (state === 'won') {
+    title.textContent = '🎉 VOCÊ VENCEU!';
+    title.style.color = '#f5d060';
+  } else {
+    title.textContent = '💀 GAME OVER';
+    title.style.color = '#ff5a5a';
+  }
+  wordEl.innerHTML = 'A palavra era: <strong>' + word.toUpperCase() + '</strong>';
+  document.getElementById('overlay').classList.add('show');
+}
+
+/* ── Canvas da Forca ── */
+function drawGallows() {
+  const canvas = document.getElementById('gallows');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 220, 260);
+
+  ctx.strokeStyle = '#c8b996';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+
+  // Base
+  ctx.beginPath(); ctx.moveTo(20, 245); ctx.lineTo(200, 245); ctx.stroke();
+  // Poste
+  ctx.beginPath(); ctx.moveTo(60, 245); ctx.lineTo(60, 20); ctx.stroke();
+  // Topo
+  ctx.beginPath(); ctx.moveTo(60, 20); ctx.lineTo(150, 20); ctx.stroke();
+  // Corda
+  ctx.strokeStyle = '#b8a070';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(150, 20); ctx.lineTo(150, 50); ctx.stroke();
+  // Suporte diagonal
+  ctx.strokeStyle = '#c8b996';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(60, 80); ctx.lineTo(110, 20); ctx.stroke();
+
+  const hx = 150, hy = 70;
+  const col = wrong >= MAX_ERROS ? '#ff5a5a' : '#e0c8a0';
+
+  if (wrong >= 1) { // cabeça
+    ctx.strokeStyle = col; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(hx, hy, 20, 0, Math.PI * 2); ctx.stroke();
+    if (wrong >= MAX_ERROS) { // rosto triste
+      ctx.beginPath(); ctx.arc(hx, hy + 5, 8, Math.PI, 0); ctx.stroke();
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(hx - 6, hy - 5, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(hx + 6, hy - 5, 3, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  if (wrong >= 2) { // corpo
+    ctx.strokeStyle = col; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(hx, hy + 20); ctx.lineTo(hx, hy + 75); ctx.stroke();
+  }
+  if (wrong >= 3) { // braço esq
+    ctx.beginPath(); ctx.moveTo(hx, hy + 35); ctx.lineTo(hx - 28, hy + 60); ctx.stroke();
+  }
+  if (wrong >= 4) { // braço dir
+    ctx.beginPath(); ctx.moveTo(hx, hy + 35); ctx.lineTo(hx + 28, hy + 60); ctx.stroke();
+  }
+  if (wrong >= 5) { // perna esq
+    ctx.beginPath(); ctx.moveTo(hx, hy + 75); ctx.lineTo(hx - 22, hy + 115); ctx.stroke();
+  }
+  if (wrong >= 6) { // perna dir
+    ctx.beginPath(); ctx.moveTo(hx, hy + 75); ctx.lineTo(hx + 22, hy + 115); ctx.stroke();
+  }
+}
+
+/* ── Partículas ── */
+const pCanvas = document.getElementById('particles');
+const pCtx = pCanvas.getContext('2d');
+let particles = [];
+
+function resizeParticles() {
+  pCanvas.width  = window.innerWidth;
+  pCanvas.height = window.innerHeight;
+}
+resizeParticles();
+window.addEventListener('resize', resizeParticles);
+
+function spawnParticles(color, n) {
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
+  for (let i = 0; i < n; i++) {
+    particles.push({
+      x: cx + (Math.random() - 0.5) * 200,
+      y: cy + (Math.random() - 0.5) * 100,
+      vx: (Math.random() - 0.5) * 6,
+      vy: Math.random() * -7 - 1,
+      life: 1,
+      size: Math.random() * 6 + 3,
+      color
+    });
+  }
+}
+
+function animParticles() {
+  pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+  particles = particles.filter(p => p.life > 0);
+  for (const p of particles) {
+    p.x  += p.vx;
+    p.y  += p.vy;
+    p.vy += 0.2;
+    p.life -= 0.025;
+    pCtx.globalAlpha = p.life;
+    pCtx.fillStyle   = p.color;
+    pCtx.beginPath();
+    pCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    pCtx.fill();
+  }
+  pCtx.globalAlpha = 1;
+  requestAnimationFrame(animParticles);
+}
+animParticles();
+
+/* ── Shake ── */
+let shakeAmount = 0;
+function shakeCanvas() { shakeAmount = 8; shakeStep(); }
+function shakeStep() {
+  if (shakeAmount <= 0) {
+    document.querySelector('.left').style.transform = '';
+    return;
+  }
+  const dx = (Math.random() - 0.5) * shakeAmount;
+  const dy = (Math.random() - 0.5) * shakeAmount * 0.5;
+  document.querySelector('.left').style.transform = `translate(${dx}px,${dy}px)`;
+  shakeAmount -= 1;
+  setTimeout(shakeStep, 30);
+}
+
+/* ── Teclado físico ── */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && gameOver) { newGame(); return; }
+  if (e.key.length === 1 && /[a-zA-ZÀ-ú]/.test(e.key)) {
+    guess(e.key.toLowerCase());
+  }
+});
+
+newGame();
+</script>
+</body>
+</html>
