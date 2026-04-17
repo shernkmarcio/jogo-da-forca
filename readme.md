@@ -9,4 +9,4 @@ Entrada de letras pelo usuário
 Controle de acertos e erros
 Condição de vitória e derrota
 🖥️ Tecnologias utilizadas
-Python
+Python...
